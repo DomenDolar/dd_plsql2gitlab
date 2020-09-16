@@ -21,7 +21,7 @@ Description of function sendPackage2Git(</br>
   p_extension varchar2(100) := '.sql';</br>
      
 </br>
- The function returs response from GITLAB repository. </br>
+ The function returns response from GITLAB repository. </br>
 
 
 
