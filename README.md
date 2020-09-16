@@ -1,6 +1,6 @@
 # dd_plsql2gitlab
 
-Package is prepared to transfer PACAKAGE CODE to the GITLAB with PL/SQL. You can change code and push any code to the GITLAB using pure PL/SQL.</br></br>
+Package is prepared to transfer PACKAGE CODE to the GITLAB with PL/SQL. You can change code and push any code to the GITLAB using pure PL/SQL.</br></br>
 
 Description of function sendPackage2Git(</br>
      p_project => :p_project,                - the name of the PACKAGE object in database</br>
