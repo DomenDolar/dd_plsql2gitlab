@@ -2,8 +2,8 @@
 
 Package is prepared to transfer PACAKAGE CODE to the GITLAB with PL/SQL. You can change code and push any code to the GITLAB using pure PL/SQL.
 
-Description of function sendPackage2Git(
-     p_project => :p_project,                - the name of the PACKAGE object in database
+Description of function sendPackage2Git(</br>
+     p_project => :p_project,                - the name of the PACKAGE object in database</br>
      p_owner => :p_owner,                    - owner or. schema where PECKAGE is
      p_authormail => :p_authormail,          - your email addres that is pushed to GITLAB
      p_author => :p_author,                  - your namr that is pushed to GITLAB
