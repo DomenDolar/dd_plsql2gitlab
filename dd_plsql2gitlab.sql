@@ -23,7 +23,7 @@ create or replace package dd_plsql2gitlab is
   */
 
   -- git settings
-  p_gitlab_url varchar2(100) := 'http://gitlab.zpiz.si'; -- http://gitlab.com
+  p_gitlab_url varchar2(100) := 'http://gitlab.com'; 
   p_gitlab_api varchar2(10) := '/api/v4'; -- version of your gitlab api
   -- git custom location settings
   p_path      varchar2(100) := 'src/main/';
