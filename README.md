@@ -10,8 +10,15 @@ Description of function sendPackage2Git(
      p_commitmessage => :p_commitmessage,    - commit message for GITLAB
      p_gittoken_coded => :p_gittoken_coded   - token from GITLAB. The token is coded with function codeGitToken. You get token on GITLAB -> Settings -> Access Tokens -> Personal Access Tokens = check API and create token.
      );
-     
- You can set URL, PATH in variables in package.    
+
+ The code of PACKAGE is pushed to src/main/ with sufix .sql.  You can set URL, PATH in variables in package in public variables.   
+ 
+   -- git settings
+  p_gitlab_url varchar2(100) := 'http://gitlab.com'; 
+  p_gitlab_api varchar2(10) := '/api/v4'; -- version of your gitlab api
+  -- git custom location settings
+  p_path      varchar2(100) := 'src/main/';
+  p_extension varchar2(100) := '.sql';
      
 
  The function returs response from GITLAB repository. 
