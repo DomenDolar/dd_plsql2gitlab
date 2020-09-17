@@ -23,7 +23,7 @@ create or replace package dd_plsql2gitlab is
   */
 
   -- git settings
-  p_gitlab_url varchar2(100) := 'http://gitlab.com'; 
+  p_gitlab_url varchar2(100) := 'http://gitlab.zpiz.si'; -- http://gitlab.com
   p_gitlab_api varchar2(10) := '/api/v4'; -- version of your gitlab api
   -- git custom location settings
   p_path      varchar2(100) := 'src/main/';
@@ -49,6 +49,14 @@ Sample:
   'token generated on gitlab' -- token generated in git GITLAB -> Settings -> Access Tokens -> Personal Access Tokens = check API and create token. Then code this token with function codeGitToken.
   );
 */
+
+  function sendCustom2Git(p_project        varchar2,
+                           p_content        clob,
+                           p_path           varchar2 default 'src/main/',
+                           p_authormail     varchar2,
+                           p_author         varchar2,
+                           p_commitMessage  varchar2,
+                           p_gittoken_coded varchar2) return varchar2;
 
 end dd_plsql2gitlab;
 /
@@ -376,6 +384,132 @@ create or replace ';
     return substr(v_resp_lob, 1, 32000);
   
   end;
+
+  function sendCustom2Git(p_project        varchar2,
+                           p_content        clob,
+                           p_path           varchar2 default 'src/main/',
+                           p_authormail     varchar2,
+                           p_author         varchar2,
+                           p_commitMessage  varchar2,
+                           p_gittoken_coded varchar2) return varchar2 is
+    v_GITProject  varchar2(100);
+    v_GITid       number;
+    v_GITFileName varchar2(100);
+    v_GITFIlePath varchar2(100);
+    v_resp_lob    clob;
+    v_content     clob;
+  begin
+  
+    dbms_output_put_line('---1. We read all projects from SDM---');
+  
+    v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api || '/projects/',
+                          'GET',
+                          p_gittoken_coded);
+  
+    dbms_output_put_line('---2. We check if project already exists---');
+    declare
+    begin
+      select name, id
+        into v_GITProject, v_GITid
+        from json_table(v_resp_lob,
+                        '$[*]' COLUMNS(id number PATH '$.id',
+                                name varchar2(100) PATH '$.name',
+                                description varchar2(100) PATH
+                                '$.description')) jt
+       where name = p_project;
+    exception
+      when others then
+        null;
+    end;
+  
+    if v_GITid is null then
+      -- project does not exists
+      dbms_output_put_line('---3.2 Project does not exists---');
+      dbms_output_put_line('Createing project...');
+      v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api ||
+                            '/projects?name=' || p_project,
+                            'POST',
+                            p_gittoken_coded);
+    
+      select name, id
+        into v_GITProject, v_GITid
+        from json_table(v_resp_lob,
+                        '$[*]' COLUMNS(id varchar2(100) PATH '$.id',
+                                name varchar2(100) PATH '$.name')) jt;
+    
+      dbms_output_put_line('Project created: ID:' || v_GITid || ' NAME:' ||
+                           v_GITProject || '');
+    
+    else
+      -- project exists
+      dbms_output_put_line('---3.2 Project exists ID:' || v_GITid ||
+                           ' NAME:' || v_GITProject || '---');
+    
+    end if;
+  
+    v_content := p_content;
+  
+    if v_GITid is not null and v_content is not null then
+    
+      dbms_output_put_line('---4. We read files in project---');
+    
+      v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api || '/projects/' ||
+                            v_GITid ||
+                            '/repository/tree/?ref=master&recursive=true',
+                            'GET',
+                            p_gittoken_coded);
+    
+      dbms_output_put_line('---5. Filter files---');
+    
+      declare
+      begin
+        select name, path
+          into v_GITFileName, v_GITFIlePath
+          from json_table(v_resp_lob,
+                          '$[*]' COLUMNS(name varchar2(100) PATH '$.name',
+                                  path varchar2(100) PATH '$.path')) jt
+         where name = p_project || p_extension;
+      
+        dbms_output_put_line('---6.1 Update existing file---');
+        v_resp_lob := write2GIT(p_gitlab_url || p_gitlab_api ||
+                                '/projects/' || v_GITid ||
+                                '/repository/files/',
+                                p_path,
+                                p_project || p_extension,
+                                'PUT',
+                                v_content,
+                                p_authormail,
+                                p_author,
+                                p_commitMessage,
+                                p_gittoken_coded);
+        dbms_output_put_line('Response file update:' || v_resp_lob);
+      
+      exception
+        when no_data_found then
+          dbms_output_put_line('---6.2 Create new file---');
+          v_resp_lob := write2GIT(p_gitlab_url || p_gitlab_api ||
+                                  '/projects/' || v_GITid ||
+                                  '/repository/files/',
+                                  p_path,
+                                  p_project || p_extension,
+                                  'POST',
+                                  v_content,
+                                  p_authormail,
+                                  p_author,
+                                  p_commitMessage,
+                                  p_gittoken_coded);
+          dbms_output_put_line('Response file update:' || v_resp_lob);
+        
+      end;
+    
+      return substr(v_resp_lob, 1, 32000);
+    
+    end if; --v_GITid is not null
+  
+    return substr(v_resp_lob, 1, 32000);
+  
+  end;
+
 
 end dd_plsql2gitlab;
 /
