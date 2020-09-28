@@ -4,6 +4,7 @@ Package is prepared to transfer PACKAGE CODE to the GITLAB with PL/SQL. You can 
 
 Description of function sendPackage2Git(</br>
      p_project => :p_project,                - the name of the PACKAGE object in database</br>
+     p_group => :p_group                     - group where to store project
      p_owner => :p_owner,                    - owner or. schema where PECKAGE is</br>
      p_authormail => :p_authormail,          - your email addres that is pushed to GITLAB</br>
      p_author => :p_author,                  - your namr that is pushed to GITLAB</br>
