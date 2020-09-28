@@ -23,7 +23,7 @@ create or replace package dd_plsql2gitlab is
   */
 
   -- git settings
-  p_gitlab_url varchar2(100) := 'http://gitlab.zpiz.si'; -- http://gitlab.com
+  p_gitlab_url varchar2(100) := 'http://gitlab.com'; -- http://gitlab.com
   p_gitlab_api varchar2(10) := '/api/v4'; -- version of your gitlab api
   -- git custom location settings
   p_path      varchar2(100) := 'src/main/';
@@ -32,6 +32,7 @@ create or replace package dd_plsql2gitlab is
   function codeGitToken(p_code varchar2) return varchar2;
 
   function sendPackage2Git(p_project        varchar2,
+                           p_group          varchar2, 
                            p_owner          varchar2,
                            p_authormail     varchar2,
                            p_author         varchar2,
@@ -42,6 +43,7 @@ create or replace package dd_plsql2gitlab is
 Sample:
 :v_put2git := zpizlib.dd_plsql2gitlab.sendPackage2Git(
   'PACKAGE', -- package in DB
+  'GROUP', --  group from GIT
   'USER',   -- schema where package is
   'my@mail', -- your mail in git
   'd D',      -- your name in git 
@@ -51,8 +53,10 @@ Sample:
 */
 
   function sendCustom2Git(p_project        varchar2,
+                           p_group          varchar2, 
                            p_content        clob,
                            p_path           varchar2 default 'src/main/',
+                           p_file           varchar2,                           
                            p_authormail     varchar2,
                            p_author         varchar2,
                            p_commitMessage  varchar2,
@@ -66,6 +70,7 @@ create or replace package body dd_plsql2gitlab is
   begin
   
     -- dbms_output_put_line(p_text);
+    --htp.p(p_text);
     null;
   end;
 
@@ -219,6 +224,7 @@ create or replace ';
                  '", "commit_message": "From rasd.dd_plsql2gitlab: ' ||
                  escapeJson(pcommit) || '"}';
   
+  
     dbms_output_put_line('Request URL: ' || l_http_req.url);
     dbms_output_put_line('Request Method: ' || l_http_req.method);
     dbms_output_put_line('Request Version: ' || l_http_req.http_version);
@@ -262,6 +268,7 @@ create or replace ';
   end;
 
   function sendPackage2Git(p_project        varchar2,
+                           p_group          varchar2, 
                            p_owner          varchar2,
                            p_authormail     varchar2,
                            p_author         varchar2,
@@ -271,6 +278,8 @@ create or replace ';
     v_GITid       number;
     v_GITFileName varchar2(100);
     v_GITFIlePath varchar2(100);
+    v_GITGroup  varchar2(100);
+    v_GITGroupid number;
     v_resp_lob    clob;
     v_content     clob;
   begin
@@ -301,10 +310,46 @@ create or replace ';
       -- project does not exists
       dbms_output_put_line('---3.2 Project does not exists---');
       dbms_output_put_line('Createing project...');
+      -- READ GROUPS if GROUP EXISTS
+    dbms_output_put_line('---3.2.1. We read all groups from SDM---');
+  
+    v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api || '/groups/',
+                          'GET',
+                          p_gittoken_coded);
+  
+    dbms_output_put_line('---3.2.2. We check if group already exists---');
+    declare
+    begin
+      select name, id
+        into v_GITGroup, v_GITGroupid
+        from json_table(v_resp_lob,
+                        '$[*]' COLUMNS(id number PATH '$.id',
+                                name varchar2(100) PATH '$.name',
+                                description varchar2(100) PATH
+                                '$.description')) jt
+       where name = p_group;
+    exception
+      when others then
+        null;
+    end;
+    if v_GITGroupid is null then -- uses default group and that is user id
+
+    dbms_output_put_line('---3.2.3. Createing project without group (using default = user)---');
       v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api ||
-                            '/projects?name=' || p_project,
+                            '/projects?name=' || p_project ,
                             'POST',
                             p_gittoken_coded);
+      
+    else
+
+    dbms_output_put_line('---3.2.3. Createing project with group '||v_GITGroup||'---');
+      v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api ||
+                            '/projects?name=' || p_project ||'&namespace_id='||v_GITGroupid,
+                            'POST',
+                            p_gittoken_coded);
+     
+    end if;  
+      
     
       select name, id
         into v_GITProject, v_GITid
@@ -386,8 +431,10 @@ create or replace ';
   end;
 
   function sendCustom2Git(p_project        varchar2,
+                           p_group          varchar2, 
                            p_content        clob,
                            p_path           varchar2 default 'src/main/',
+                           p_file           varchar2,
                            p_authormail     varchar2,
                            p_author         varchar2,
                            p_commitMessage  varchar2,
@@ -396,6 +443,8 @@ create or replace ';
     v_GITid       number;
     v_GITFileName varchar2(100);
     v_GITFIlePath varchar2(100);
+    v_GITGroup  varchar2(100);
+    v_GITGroupid number;    
     v_resp_lob    clob;
     v_content     clob;
   begin
@@ -425,11 +474,49 @@ create or replace ';
     if v_GITid is null then
       -- project does not exists
       dbms_output_put_line('---3.2 Project does not exists---');
-      dbms_output_put_line('Createing project...');
+      dbms_output_put_line('Createing project...');     
+
+      -- READ GROUPS if GROUP EXISTS
+    dbms_output_put_line('---3.2.1. We read all groups from SDM---');
+  
+    v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api || '/groups/',
+                          'GET',
+                          p_gittoken_coded);
+  
+    dbms_output_put_line('---3.2.2. We check if group already exists---');
+    declare
+    begin
+      select name, id
+        into v_GITGroup, v_GITGroupid
+
+        from json_table(v_resp_lob,
+                        '$[*]' COLUMNS(id number PATH '$.id',
+                                name varchar2(100) PATH '$.name',
+                                description varchar2(100) PATH
+                                '$.description')) jt
+       where name = p_group;
+    exception
+      when others then
+        null;
+    end;
+    if v_GITGroupid is null then -- uses default group and that is user id
+
+    dbms_output_put_line('---3.2.3. Createing project without group (using default = user)---');
       v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api ||
-                            '/projects?name=' || p_project,
+                            '/projects?name=' || p_project ,
                             'POST',
                             p_gittoken_coded);
+      
+    else
+
+    dbms_output_put_line('---3.2.3. Createing project with group '||v_GITGroup||'---');
+      v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api ||
+                            '/projects?name=' || p_project ||'&namespace_id='||v_GITGroupid,
+                            'POST',
+                            p_gittoken_coded);
+     
+    end if;  
+
     
       select name, id
         into v_GITProject, v_GITid
@@ -468,14 +555,14 @@ create or replace ';
           from json_table(v_resp_lob,
                           '$[*]' COLUMNS(name varchar2(100) PATH '$.name',
                                   path varchar2(100) PATH '$.path')) jt
-         where name = p_project || p_extension;
+         where name = p_file;
       
         dbms_output_put_line('---6.1 Update existing file---');
         v_resp_lob := write2GIT(p_gitlab_url || p_gitlab_api ||
                                 '/projects/' || v_GITid ||
                                 '/repository/files/',
                                 p_path,
-                                p_project || p_extension,
+                                p_file,
                                 'PUT',
                                 v_content,
                                 p_authormail,
@@ -491,7 +578,7 @@ create or replace ';
                                   '/projects/' || v_GITid ||
                                   '/repository/files/',
                                   p_path,
-                                  p_project || p_extension,
+                                  p_file,
                                   'POST',
                                   v_content,
                                   p_authormail,
