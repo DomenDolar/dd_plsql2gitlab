@@ -1,5 +1,4 @@
 create or replace package dd_plsql2gitlab is
-
   /*
   // +----------------------------------------------------------------------+
   // | dd_plsql2gitlab - PLSQL to GITLAB procedure                          |
@@ -69,7 +68,7 @@ create or replace package body dd_plsql2gitlab is
   procedure dbms_output_put_line(p_text varchar2) is
   begin
   
-    -- dbms_output_put_line(p_text);
+    --dbms_output_put_line(p_text);
     --htp.p(p_text);
     null;
   end;
@@ -102,6 +101,16 @@ create or replace package body dd_plsql2gitlab is
     v_return := replace(v_return, chr(10), '\n'); --Newline is replaced with \n
     v_return := replace(v_return, chr(13), '\r'); --Carriage return is replaced with \r
     v_return := replace(v_return, chr(9), '\t'); --Tab is replaced with \t            
+    v_return := replace(v_return, 'š', '\u0161'); 
+    v_return := replace(v_return, 'ð', '\u0111'); 
+    v_return := replace(v_return, 'è', '\u010D'); 
+    v_return := replace(v_return, 'æ', '\u0107'); 
+    v_return := replace(v_return, 'ž', '\u017E'); 
+    v_return := replace(v_return, 'Š', '\u0160'); 
+    v_return := replace(v_return, 'Ð', '\u0110'); 
+    v_return := replace(v_return, 'È', '\u010C'); 
+    v_return := replace(v_return, 'Æ', '\u0106'); 
+    v_return := replace(v_return, 'Ž', '\u017D'); 
     return v_return;
   
   end;
@@ -286,7 +295,7 @@ create or replace ';
   
     dbms_output_put_line('---1. We read all projects from SDM---');
   
-    v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api || '/projects/',
+    v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api || '/projects/?page=1&per_page=100&search='||p_project ,
                           'GET',
                           p_gittoken_coded);
   
@@ -451,7 +460,7 @@ create or replace ';
   
     dbms_output_put_line('---1. We read all projects from SDM---');
   
-    v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api || '/projects/',
+    v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api || '/projects/?page=1&per_page=100&search='||p_project,
                           'GET',
                           p_gittoken_coded);
   
@@ -597,6 +606,105 @@ create or replace ';
   
   end;
 
+  function readFileFromGit(p_project        varchar2,
+                           p_group          varchar2, 
+                           p_path           varchar2 default 'src/main/',
+                           p_file           varchar2,
+                           p_gittoken_coded varchar2,
+                           p_version varchar2 default 'master' ) return clob is
+    v_GITProject  varchar2(100);
+    v_GITid       number;
+    v_GITFileName varchar2(100);
+    v_GITFIlePath varchar2(100);
+    v_GITGroup  varchar2(100);
+    v_GITGroupid number;    
+    v_resp_lob    clob;
+  begin
+  
+    dbms_output_put_line('---1. We read all projects from SDM---');
+  
+    v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api || '/projects/?page=1&per_page=100&search='||p_project,
+                          'GET',
+                          p_gittoken_coded);
+  
+    dbms_output_put_line('---2. We check if project already exists---');
+    declare
+    begin
+      select name, id
+        into v_GITProject, v_GITid
+        from json_table(v_resp_lob,
+                        '$[*]' COLUMNS(id number PATH '$.id',
+                                name varchar2(100) PATH '$.name',
+                                description varchar2(100) PATH
+                                '$.description')) jt
+       where name = p_project;
+    exception
+      when others then
+        null;
+    end;
+  
+    if v_GITid is null then
+      -- project does not exists
+      dbms_output_put_line('---3.2 Project does not exists---');
+      return '';
+    else
+      -- project exists
+      dbms_output_put_line('---3.2 Project exists ID:' || v_GITid ||
+                           ' NAME:' || v_GITProject || '---');    
+    end if;
+  
+
+    
+    if v_GITid is not null then
+    
+      dbms_output_put_line('---4. We read files in project---');
+    
+      v_resp_lob := readGIT(p_gitlab_url || p_gitlab_api || '/projects/' ||
+                            v_GITid ||
+                            '/repository/tree/?ref=master&recursive=true',
+                            'GET',
+                            p_gittoken_coded);
+    
+      dbms_output_put_line('---5. Filter files---');
+    
+    
+
+    
+      declare
+      begin
+        select name, path
+          into v_GITFileName, v_GITFIlePath
+          from json_table(v_resp_lob,
+                          '$[*]' COLUMNS(name varchar2(100) PATH '$.name',
+                                  path varchar2(100) PATH '$.path')) jt
+         where name = p_file;
+      
+        dbms_output_put_line('---6.1 Reading existing file---');
+
+        v_resp_lob := readGit(p_gitlab_url || p_gitlab_api || '/projects/' ||
+                              v_GITid ||
+                              '/repository/files/'||
+                              utl_url.escape(p_path||'/'||p_file,true)||'?ref='||p_version,
+                              'GET',
+                              p_gittoken_coded);                                
+
+        dbms_output_put_line('Response file update:' || v_resp_lob);
+
+                      
+      exception
+        when no_data_found then
+          dbms_output_put_line('---6.2 File does not exists---');
+          v_resp_lob := '';
+        
+      end;
+    
+      return v_resp_lob;
+    
+    end if; --v_GITid is not null
+  
+    return v_resp_lob;
+  
+  end;
+
 
 end dd_plsql2gitlab;
-/
