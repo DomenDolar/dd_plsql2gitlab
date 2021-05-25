@@ -1,4 +1,5 @@
 create or replace package dd_plsql2gitlab is
+
   /*
   // +----------------------------------------------------------------------+
   // | dd_plsql2gitlab - PLSQL to GITLAB procedure                          |
@@ -60,6 +61,15 @@ Sample:
                            p_author         varchar2,
                            p_commitMessage  varchar2,
                            p_gittoken_coded varchar2) return varchar2;
+                           
+
+  function readFileFromGit(p_project        varchar2,
+                           p_group          varchar2, 
+                           p_path           varchar2 , --default 'src/main/',
+                           p_file           varchar2,
+                           p_gittoken_coded varchar2,
+                           p_version varchar2 default 'master'--The name of branch, tag or commit
+                           ) return clob;                           
 
 end dd_plsql2gitlab;
 /
@@ -68,7 +78,7 @@ create or replace package body dd_plsql2gitlab is
   procedure dbms_output_put_line(p_text varchar2) is
   begin
   
-    --dbms_output_put_line(p_text);
+    --dbms_output.put_line(p_text);
     --htp.p(p_text);
     null;
   end;
@@ -608,7 +618,7 @@ create or replace ';
 
   function readFileFromGit(p_project        varchar2,
                            p_group          varchar2, 
-                           p_path           varchar2 default 'src/main/',
+                           p_path           varchar2, -- default 'src/main/',
                            p_file           varchar2,
                            p_gittoken_coded varchar2,
                            p_version varchar2 default 'master' ) return clob is
@@ -680,11 +690,11 @@ create or replace ';
          where name = p_file;
       
         dbms_output_put_line('---6.1 Reading existing file---');
-
-        v_resp_lob := readGit(p_gitlab_url || p_gitlab_api || '/projects/' ||
+   
+          v_resp_lob := readGit(p_gitlab_url || p_gitlab_api || '/projects/' ||
                               v_GITid ||
                               '/repository/files/'||
-                              utl_url.escape(p_path||'/'||p_file,true)||'?ref='||p_version,
+                              utl_url.escape(p_path||p_file,true)||'?ref='||p_version,
                               'GET',
                               p_gittoken_coded);                                
 
@@ -708,3 +718,4 @@ create or replace ';
 
 
 end dd_plsql2gitlab;
+/
